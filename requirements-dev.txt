@@ -1,0 +1,4 @@
+-r requirements-test.txt
+
+netaddr
+mfd-code-quality >= 1.2.0, <2

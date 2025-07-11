@@ -1,0 +1,7 @@
+mfd-typing>=1.23.0
+mfd-connect>=7.12
+mfd-sysctl>=1.6.0
+mfd-devcon>=2.0.0
+mfd-const>=0.23.0
+mfd-ethtool>=3.14.0
+mfd-win-registry>=1.17.0
