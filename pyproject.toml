@@ -12,7 +12,7 @@ dependencies = { file = ["requirements.txt"] }
 name = "mfd-package-manager"
 description = "Module for managing packages, drivers, and modules across Linux, Windows, ESXi, and FreeBSD systems."
 requires-python = ">=3.10, <3.14"
-version = "2.23.0"
+version = "3.0.0"
 dynamic = ["dependencies"]
 license-files = ["LICENSE.md", "AUTHORS.md"]
 readme = {file = "README.md", content-type = "text/markdown"}
