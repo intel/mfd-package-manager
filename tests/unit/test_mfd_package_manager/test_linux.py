@@ -163,7 +163,7 @@ class TestLinuxPackageManager:
         manager._connection.execute_command.return_value = ConnectionCompletedProcess(
             args="", stdout=output, return_code=0
         )
-        assert manager.get_driver_info("i40e") == DriverInfo(driver_name="N/A", driver_version="N/A")
+        assert manager.get_driver_info("i40e") == DriverInfo(driver_name="i40e", driver_version="N/A")
 
     def test_insert_module(self, manager):
         manager.insert_module("i40e", "-a")

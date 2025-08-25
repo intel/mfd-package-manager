@@ -158,7 +158,7 @@ class LinuxPackageManager(UnixPackageManager):
         name_regex = r"^\s*name:\s+(?P<name>.*)"
         version_match = re.search(version_regex, result.stdout, flags=re.MULTILINE)
         name_match = re.search(name_regex, result.stdout, flags=re.MULTILINE)
-        name = name_match.group("name") if name_match is not None else "N/A"
+        name = name_match.group("name") if name_match is not None else driver_name
         version = version_match.group("version") if version_match is not None else "N/A"
         return DriverInfo(driver_version=version, driver_name=name)
 
