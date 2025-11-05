@@ -708,3 +708,126 @@ class TestLinuxPackageManager:
         assert manager._LinuxPackageManager__ethtool is None
         manager._ethtool
         assert manager._LinuxPackageManager__ethtool is not None
+
+    def test_install_rdma_drivers_success(self, manager, mocker):
+        # prepare controller and remote paths
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("/home/user/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        # pretend all Paths exist
+        mocker.patch("mfd_package_manager.linux.Path.exists", return_value=True)
+
+        # glob returns exactly one irdma tar file located under RDMA/Linux
+        irdma_file = controller_build_path / "RDMA" / "Linux" / "irdma-1.2.3.tgz"
+        mocker.patch("mfd_package_manager.linux.Path.glob", return_value=[irdma_file])
+
+        # make connection.path return Path objects for remote paths
+        manager._connection.path.side_effect = lambda p: Path(p)
+
+        copy_mock = mocker.patch("mfd_package_manager.linux.copy")
+
+        # ensure execute_command returns success for all commands
+        manager._connection.execute_command.return_value = ConnectionCompletedProcess(args="", stdout="", return_code=0)
+
+        # call the method
+        manager.install_rdma_drivers(str(controller_build_path))
+
+        # copy should be called with controller src and connection dst
+        copy_mock.assert_called_once_with(
+            src_conn=manager._controller_connection,
+            dst_conn=manager._connection,
+            source=irdma_file,
+            target=Path(f"/tmp/{irdma_file.name}"),
+        )
+
+        # verify build and install commands were invoked (cwd equals remote irdma dir)
+        remote_dir = Path(f"/tmp/{irdma_file.name.replace('.tgz','')}")
+        manager._connection.execute_command.assert_any_call(
+            "./build.sh", expected_return_codes={0}, shell=True, cwd=remote_dir
+        )
+        manager._connection.execute_command.assert_any_call(
+            "./install_core.sh", expected_return_codes={0}, shell=True, cwd=remote_dir
+        )
+
+    def test_install_rdma_drivers_no_tar(self, manager, mocker):
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("/home/user/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        mocker.patch("mfd_package_manager.linux.Path.exists", return_value=True)
+        mocker.patch("mfd_package_manager.linux.Path.glob", return_value=[])
+
+        with pytest.raises(PackageManagerNotFoundException, match="No irdma tar files found in build path."):
+            manager.install_rdma_drivers(str(controller_build_path))
+
+    def test_install_rdma_drivers_multiple_tar(self, manager, mocker):
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("/home/user/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        mocker.patch("mfd_package_manager.linux.Path.exists", return_value=True)
+        tf1 = controller_build_path / "RDMA" / "Linux" / "irdma-1.2.3.tgz"
+        tf2 = controller_build_path / "RDMA" / "Linux" / "irdma-2.0.0.tgz"
+        mocker.patch("mfd_package_manager.linux.Path.glob", return_value=[tf1, tf2])
+
+        with pytest.raises(PackageManagerModuleException, match="Multiple irdma tar files found in build path."):
+            manager.install_rdma_drivers(str(controller_build_path))
+
+    def test_install_rdma_drivers_runs_build_core(self, manager, mocker):
+        # Ensure the sh -c build_core command path is executed
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("/home/user/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        mocker.patch("mfd_package_manager.linux.Path.exists", return_value=True)
+        irdma_file = controller_build_path / "RDMA" / "Linux" / "irdma-1.2.3.tgz"
+        mocker.patch("mfd_package_manager.linux.Path.glob", return_value=[irdma_file])
+
+        manager._connection.path.side_effect = lambda p: Path(p)
+        manager._connection.execute_command.return_value = ConnectionCompletedProcess(args="", stdout="", return_code=0)
+
+        manager.install_rdma_drivers(str(controller_build_path))
+
+        remote_dir = Path(f"/tmp/{irdma_file.name.replace('.tgz','')}")
+        expected = f"sh -c '{remote_dir}/build_core.sh -y'"
+        manager._connection.execute_command.assert_any_call(
+            expected, expected_return_codes={0}, shell=True, stderr_to_stdout=True
+        )
+
+    def test_install_rdma_drivers_tar_extraction(self, manager, mocker):
+        # Ensure tar extraction command is executed with expected args
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("/home/user/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        mocker.patch("mfd_package_manager.linux.Path.exists", return_value=True)
+        irdma_file = controller_build_path / "RDMA" / "Linux" / "irdma-1.2.3.tgz"
+        mocker.patch("mfd_package_manager.linux.Path.glob", return_value=[irdma_file])
+
+        # make remote path resolver return pathlib.Path
+        manager._connection.path.side_effect = lambda p: Path(p)
+        # stub execute_command to success
+        manager._connection.execute_command.return_value = ConnectionCompletedProcess(
+            args="", stdout="", return_code=0
+        )
+
+        manager.install_rdma_drivers(str(controller_build_path))
+
+        remote_irdma_tar = Path(f"/tmp/{irdma_file.name}")
+        manager._connection.execute_command.assert_any_call(
+            f"tar -zxvf {remote_irdma_tar} -C /tmp/ --no-same-owner",
+            expected_return_codes={0},
+            shell=True,
+        )
+        
+    def test_install_rdma_drivers_missing_build(self, manager, mocker):
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("/home/user/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        mocker.patch("mfd_package_manager.linux.Path.exists", return_value=False)
+        with pytest.raises(
+            PackageManagerNotFoundException, match=re.escape(f"Build path {controller_build_path} does not exist.")
+        ):
+            manager.install_rdma_drivers(str(controller_build_path))

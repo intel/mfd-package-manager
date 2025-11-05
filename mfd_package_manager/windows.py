@@ -55,6 +55,14 @@ class WindowsPackageManager(PackageManager):
         "WS2025": range(26000, 26999),
     }
 
+    RDMA_FOLDER_OS_VERSION_MATCH = {
+        "ws2019": range(17600, 19042 + 1),
+        "W10": range(19044, 19044 + 1),
+        "ws2022": list(chain(range(20348, 22000), [23598], range(25000, 25999))),
+        "W11": range(22000, 22999),
+        "ws2025": range(26000, 26999),
+    }
+
     def _prepare_map(self) -> Dict[str, Set]:
         """Update mapping for Windows driver names."""
         driver_map = cpy.copy(DRIVER_DEVICE_ID_MAP)
@@ -542,6 +550,19 @@ class WindowsPackageManager(PackageManager):
                 return folder
         raise PackageManagerConnectedOSNotSupported(f"Windows in version {os_version} is not supported by module.")
 
+    def _get_rdma_folder_for_os_version(self, os_version: int) -> str:
+        """
+        Return correct Windows OS directory required for RDMA driver searching.
+
+        :param os_version: Version of Windows kernel.
+        :return: Directory correct for version.
+        :raises PackageManagerConnectedOSNotSupported: When version is not supported.
+        """
+        for folder, version in self.RDMA_FOLDER_OS_VERSION_MATCH.items():
+            if os_version in version:
+                return folder
+        raise PackageManagerConnectedOSNotSupported(f"Windows in version {os_version} is not supported by module.")
+
     def find_drivers(self, build_path: Union[str, Path], device_id: "DeviceID") -> List[Path]:
         """
         Find drivers in build path for given driver_details.
@@ -902,3 +923,47 @@ class WindowsPackageManager(PackageManager):
         except KeyError:
             logger.log(level=logging.WARNING, msg="Unable to find the default feature values")
             return []
+
+    def install_rdma_drivers(self, build_path: "Path | str") -> None:
+        """
+        Install RDMA drivers from build path.
+
+        :param build_path: Path to build
+        :raises PackageManagerNotFoundException: when not found something in flow
+        """
+        if isinstance(build_path, str):
+            build_path = self._controller_connection.path(build_path)
+        build_path = build_path / "RDMA" / "Windows"
+        if not build_path.exists():
+            raise PackageManagerNotFoundException(f"Build path {build_path} does not exist.")
+        kernel_version = int(self._connection.get_system_info().kernel_version)
+        windows_version_folder = self._get_rdma_folder_for_os_version(kernel_version)
+        logger.log(
+            level=log_levels.MODULE_DEBUG,
+            msg=f"Going to use {windows_version_folder} windows version directory for {kernel_version}.",
+        )
+        specific_rdma_on_controller_path = build_path / windows_version_folder
+
+        if not specific_rdma_on_controller_path.exists():
+            raise PackageManagerNotFoundException(
+                f"RDMA path {specific_rdma_on_controller_path} does not exist on controller."
+            )
+        rdma_remote_path = self._connection.path(self.DRIVERS_REMOTE_LOCATION, "RDMA")
+        copy(
+            src_conn=self._controller_connection,
+            dst_conn=self._connection,
+            source=specific_rdma_on_controller_path / "*",
+            target=rdma_remote_path,
+        )
+        inf_file_path = rdma_remote_path / "indv2.inf"
+        if not inf_file_path.exists():
+            raise PackageManagerNotFoundException(f"RDMA inf file path {inf_file_path} does not exist.")
+        logger.log(level=log_levels.MODULE_DEBUG, msg=f"Installing RDMA driver from {inf_file_path}")
+        self.install_certificates_from_driver(str(inf_file_path))
+        self.install_inf_driver_for_matching_devices(str(inf_file_path))
+        driver_list = self.get_driver_files()
+        for driver in driver_list:
+            if "indv2.inf" in driver.original_name.casefold():
+                logger.log(level=log_levels.MODULE_DEBUG, msg="RDMA driver installed successfully.")
+                return
+        raise PackageManagerModuleException("RDMA driver installation failed.")

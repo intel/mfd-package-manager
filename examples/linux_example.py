@@ -51,3 +51,6 @@ package_manager.pip_install_packages(
 package_manager.is_package_installed_via_rpm(package="make", cwd="/home/user")
 package_manager.is_package_installed_via_dpkg(package="docker")
 package_manager.install_package_via_dnf("1.2.3", cwd="/home")
+
+# install rdma drivers from build path
+package_manager.install_rdma_drivers("/home/rdma_drivers/build")

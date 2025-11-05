@@ -1106,3 +1106,98 @@ Intel(R) Network Connections -- Error in configuration.
         assert 23598 in manager.FOLDER_OS_VERSION_MATCH["WS2022"]
         assert 20348 in manager.FOLDER_OS_VERSION_MATCH["WS2022"]
         assert 9200 in manager.FOLDER_OS_VERSION_MATCH["NDIS64"]
+
+    def test_install_rdma_drivers_success(self, manager, mocker):
+        # prepare controller and remote paths
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("C:/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        # ensure controller rdma Windows path exists
+        mocker.patch("mfd_package_manager.windows.Path.exists", return_value=True)
+
+        # make manager._connection.path return a remote RDMA path
+        remote_rdma = Path(r"C:\drivers_under_test\RDMA")
+        manager._connection.path.return_value = remote_rdma
+
+        # system info kernel version that maps to W10
+        manager._connection.get_system_info.return_value.kernel_version = "19044"
+
+        # stub certificate and inf installation calls
+        manager.install_certificates_from_driver = mocker.create_autospec(manager.install_certificates_from_driver)
+        manager.install_inf_driver_for_matching_devices = mocker.create_autospec(
+            manager.install_inf_driver_for_matching_devices
+        )
+
+        # simulate driver store containing indv2.inf
+        from mfd_package_manager.data_structures import WindowsStoreDriver
+
+        driver = WindowsStoreDriver(
+            published_name="oemX.inf",
+            original_name="indv2.inf",
+            provider_name="Intel",
+            class_name="Network adapters",
+            class_guid="{4d36e972-e325-11ce-bfc1-08002be10318}",
+            driver_version="1.2.3",
+            signer_name="Microsoft",
+        )
+        manager.get_driver_files = mocker.Mock(return_value=[driver])
+
+        # call the method - should not raise
+        manager.install_rdma_drivers(str(controller_build_path))
+
+        # verify copy/installation helpers were called
+        manager.install_certificates_from_driver.assert_called_once()
+        manager.install_inf_driver_for_matching_devices.assert_called_once()
+
+    def test_install_rdma_drivers_controller_path_missing(self, manager, mocker):
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("C:/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        # simulate controller RDMA/Windows path missing
+        mocker.patch("mfd_package_manager.windows.Path.exists", return_value=False)
+
+        # If INF is missing on remote, installation will not find driver in store
+        # and should raise PackageManagerModuleException
+        with pytest.raises(PackageManagerModuleException):
+            manager.install_rdma_drivers(str(controller_build_path))
+    
+    def test_install_rdma_drivers_missing_windows_directory(self, manager, mocker):
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("C:/build")
+        manager._controller_connection.path.return_value = controller_build_path
+
+        # simulate controller RDMA/Windows path missing
+        mocker.patch("mfd_package_manager.windows.Path.exists", return_value=False)
+
+        with pytest.raises(PackageManagerModuleException):
+            manager.install_rdma_drivers(str(controller_build_path))
+
+    def test_install_rdma_drivers_no_driver_in_store(self, manager, mocker):
+        manager._controller_connection = mocker.create_autospec(LocalConnection)
+        controller_build_path = Path("C:/build")
+        manager._controller_connection.path.return_value = controller_build_path
+        mocker.patch("mfd_package_manager.windows.Path.exists", return_value=True)
+        manager._connection.path.return_value = Path(r"C:\drivers_under_test\RDMA")
+        manager._connection.get_system_info.return_value.kernel_version = "19044"
+
+        # return drivers not containing indv2.inf
+        manager.get_driver_files = mocker.Mock(return_value=[
+            WindowsStoreDriver(
+                published_name="oem1.inf",
+                original_name="other.inf",
+                provider_name="Intel",
+                class_name="Network adapters",
+                class_guid="{4d36e972-e325-11ce-bfc1-08002be10318}",
+                driver_version="1.2.3",
+                signer_name="Microsoft",
+            )
+        ])
+
+        with pytest.raises(PackageManagerModuleException):
+            manager.install_rdma_drivers(str(controller_build_path))
+
+    def test__get_rdma_folder_for_os_version_failure(self, manager):
+        with pytest.raises(PackageManagerModuleException):
+            manager._get_rdma_folder_for_os_version("99999")

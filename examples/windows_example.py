@@ -31,3 +31,6 @@ device_id = DeviceID(0x1572)
 
 package_manager.install_build(r"C:\Users\admin\Downloads\drivers", device_id)
 package_manager.install_build(r"C:\Users\admin\Downloads\drivers")  # will install on all devices
+
+# install rdma drivers from build path
+package_manager.install_rdma_drivers(r"C:\Users\admin\Downloads\drivers")

@@ -139,7 +139,8 @@ class TestMfdPackageManager:
         conn2 = mocker.create_autospec(RPyCConnection)
         conn2.get_os_name.return_value = OSName.ESXI
         with pytest.raises(
-            PackageManagerConnectedOSNotSupported, match="Not supported OS for controller PackageManager: [OSName.ESXI|VMKernel]"
+            PackageManagerConnectedOSNotSupported,
+            match="Not supported OS for controller PackageManager: [OSName.ESXI|VMKernel]",
         ):
             PackageManager(connection=conn, controller_connection=conn2)
 

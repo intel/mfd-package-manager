@@ -327,3 +327,11 @@ class PackageManager(ABC):
                 level=log_levels.MODULE_DEBUG,
                 msg="Connection interpreter is not available for other connection than Python (RPyC and Local)",
             )
+
+    def install_rdma_drivers(self) -> None:
+        """
+        Install RDMA drivers if not installed.
+
+        :raises PackageManagerModuleException: on failure
+        """
+        raise NotImplementedError("Method install_rdma_drivers is not implemented for base PackageManager class.")

@@ -741,3 +741,53 @@ class LinuxPackageManager(UnixPackageManager):
             stderr_to_stdout=True,
             cwd=cwd,
         )
+
+    def install_rdma_drivers(self, build_path: "Path | str") -> None:
+        """
+        Install RDMA drivers.
+
+        tar -zxvf irdma-X.X.X.tgz
+        cd irdma-X.X.X
+        ./build.sh
+        ./build_core.sh
+        ./install_core.sh
+
+        :param build_path: Path to build
+        """
+        if isinstance(build_path, str):
+            build_path = self._controller_connection.path(build_path)
+        if not build_path.exists():
+            raise PackageManagerNotFoundException(f"Build path {build_path} does not exist.")
+        build_path = build_path / "RDMA" / "Linux"
+        irdma_tar_files = list(build_path.glob("irdma-*.tgz"))
+        if not irdma_tar_files:
+            raise PackageManagerNotFoundException("No irdma tar files found in build path.")
+        if len(irdma_tar_files) > 1:
+            raise PackageManagerModuleException("Multiple irdma tar files found in build path.")
+        irdma_tar_file = irdma_tar_files[0]
+        remote_irdma_tar = self._connection.path(f"/tmp/{irdma_tar_file.name}")
+        copy(
+            src_conn=self._controller_connection,
+            dst_conn=self._connection,
+            source=irdma_tar_file,
+            target=remote_irdma_tar,
+        )
+        self._connection.execute_command(
+            f"tar -zxvf {remote_irdma_tar} -C /tmp/ --no-same-owner", expected_return_codes={0}, shell=True
+        )
+        irdma_dir_name = irdma_tar_file.name.replace(".tgz", "")
+        remote_irdma_dir = self._connection.path(f"/tmp/{irdma_dir_name}")
+        logger.log(level=log_levels.MODULE_DEBUG, msg="Building and installing RDMA drivers.")
+        self._connection.execute_command("./build.sh", expected_return_codes={0}, shell=True, cwd=remote_irdma_dir)
+        logger.log(level=log_levels.MODULE_DEBUG, msg="Building RDMA core drivers.")
+        self._connection.execute_command(
+            f"sh -c '{remote_irdma_dir}/build_core.sh -y'",
+            expected_return_codes={0},
+            shell=True,
+            stderr_to_stdout=True,
+        )
+        logger.log(level=log_levels.MODULE_DEBUG, msg="Installing RDMA core drivers.")
+        self._connection.execute_command(
+            "./install_core.sh", expected_return_codes={0}, shell=True, cwd=remote_irdma_dir
+        )
+        logger.log(level=log_levels.MODULE_DEBUG, msg="RDMA drivers installed successfully.")

@@ -111,6 +111,7 @@ Constructor:
 * `is_package_installed_via_rpm(self, package: str, cwd: "Path | str | None" = None) -> bool` - verify if package installed using rpm
 * `is_package_installed_via_dpkg(self, package: str, cwd: "Path | str | None" = None) -> bool`- verify if package installed using dpkg
 * `install_package_via_dnf(self, package: str, cwd: "Path | str | None" = None) -> "ConnectionCompletedProcess":` - install package using dnf
+* `install_rdma_drivers(self, build_path: "Path | str") -> None:` - install RDMA drivers from build path.
 
 #### ESXiPackageManager:
 * `get_driver_info(self, interface_name: str) -> DriverInfo` - Get driver info (name, version).
@@ -143,6 +144,7 @@ Constructor:
 * `_get_inf_device_section_name(self, build: str, section_dictionary: Dict[str, List[str]], component_id: str, client_os: bool) -> str` get the section name from the parsed section dictionary corresponding to the specified component id
 * `_get_server_or_client_section(self, section_dictionary: Dict[str, List[str]], client_os: bool) -> List[str]` get all the component ids from the parsed section dictionary for either the server or client OS section
 * `_get_default_vals_from_inf(self, device_section_name: str, section_dictionary: Dict[str, List[str]]) -> List[Tuple[str, str]]` get all advanced feature names and the default value for each feature   
+* `install_rdma_drivers(self, build_path: "Path | str") -> None:` - install RDMA drivers from build path.
 
 #### BSDPackageManager:
 * API from Unix Package Manager
