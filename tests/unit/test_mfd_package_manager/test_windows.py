@@ -1162,7 +1162,7 @@ Intel(R) Network Connections -- Error in configuration.
         # and should raise PackageManagerModuleException
         with pytest.raises(PackageManagerModuleException):
             manager.install_rdma_drivers(str(controller_build_path))
-    
+
     def test_install_rdma_drivers_missing_windows_directory(self, manager, mocker):
         manager._controller_connection = mocker.create_autospec(LocalConnection)
         controller_build_path = Path("C:/build")
@@ -1183,17 +1183,19 @@ Intel(R) Network Connections -- Error in configuration.
         manager._connection.get_system_info.return_value.kernel_version = "19044"
 
         # return drivers not containing indv2.inf
-        manager.get_driver_files = mocker.Mock(return_value=[
-            WindowsStoreDriver(
-                published_name="oem1.inf",
-                original_name="other.inf",
-                provider_name="Intel",
-                class_name="Network adapters",
-                class_guid="{4d36e972-e325-11ce-bfc1-08002be10318}",
-                driver_version="1.2.3",
-                signer_name="Microsoft",
-            )
-        ])
+        manager.get_driver_files = mocker.Mock(
+            return_value=[
+                WindowsStoreDriver(
+                    published_name="oem1.inf",
+                    original_name="other.inf",
+                    provider_name="Intel",
+                    class_name="Network adapters",
+                    class_guid="{4d36e972-e325-11ce-bfc1-08002be10318}",
+                    driver_version="1.2.3",
+                    signer_name="Microsoft",
+                )
+            ]
+        )
 
         with pytest.raises(PackageManagerModuleException):
             manager.install_rdma_drivers(str(controller_build_path))

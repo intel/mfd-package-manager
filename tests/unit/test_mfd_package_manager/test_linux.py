@@ -808,9 +808,7 @@ class TestLinuxPackageManager:
         # make remote path resolver return pathlib.Path
         manager._connection.path.side_effect = lambda p: Path(p)
         # stub execute_command to success
-        manager._connection.execute_command.return_value = ConnectionCompletedProcess(
-            args="", stdout="", return_code=0
-        )
+        manager._connection.execute_command.return_value = ConnectionCompletedProcess(args="", stdout="", return_code=0)
 
         manager.install_rdma_drivers(str(controller_build_path))
 
@@ -820,7 +818,7 @@ class TestLinuxPackageManager:
             expected_return_codes={0},
             shell=True,
         )
-        
+
     def test_install_rdma_drivers_missing_build(self, manager, mocker):
         manager._controller_connection = mocker.create_autospec(LocalConnection)
         controller_build_path = Path("/home/user/build")
